@@ -249,10 +249,12 @@ for VG in $(grep -Ew 'VG[0-9]{1,6}:' $1 | grep -Eo 'VG[0-9]{1,6}'); do
 		vgdisplay ${!vgName}
 
 
-
 		# Trabajando con LV's:
 		lvCount=1
+		requireMount=""
 		while true; do
+			lvOrderMount="LVM_${VG}_lvs_ordermount"
+			lvMountAfter="LVM_${VG}_lvs_mountafter"
 			lvName="LVM_${VG}_lvs_lv${lvCount}_name"
 			lvSize="LVM_${VG}_lvs_lv${lvCount}_size"
 			lvFS="LVM_${VG}_lvs_lv${lvCount}_filesystem"
@@ -299,13 +301,41 @@ for VG in $(grep -Ew 'VG[0-9]{1,6}:' $1 | grep -Eo 'VG[0-9]{1,6}'); do
 
 							# Verificar si el fstab ya tiene este punto de montura configurado:
 							if [[ $(awk '{print $2}' /etc/fstab | grep "^${!lvMountPoint}$" | wc -l) -eq 1 ]]; then
-								# Hay que verificar si está sobre el mismo VG y LV, sino reemplazar
+								# Verificar si está configurado para ser montado sobre el mismo VG y LV, sino reemplazar:
 								if [ $(grep /dev/${!vgName}/${!lvName} /etc/fstab | awk '{print $2}' | grep "^${!lvMountPoint}$"  | wc -l) -gt 0  || $(grep $(blkid | grep /dev/mapper/${!vgName}-${!lvName} | awk '{print $2}') /etc/fstab | wc -l) -gt 0 ]; then
-									echo "${green}(i) Se detectó que el directorio ${!lvMountPoint} ya se encuentra configurado en el /etc/fstab para ser montado sobre /dev/${!vgName}/${!lvName}. No se realizarán cambios en el /etc/fstab para este LV.${reset}"
+									# Hay que verificar si tiene la configuración de orden de montura, si esta es requerida:
+									if [[ ${!lvOrderMount} = "yes" ]]; then
+										#statements
+										if [[ ${!lvMountAfter} ]]; then
+											sed "/^$lineToReplace/c \/dev/${!vgName}/${!lvName}  ${!lvMountPoint}  $lvfileSystem   defaults,x-systemd.requires-mounts-for=${!lvMountAfter}   0 0" /etc/fstab | tee tempLVMComposer_confPersistent.txt; cat tempLVMComposer_confPersistent.txt > /etc/fstab
+										else
+											sed "/^$lineToReplace/c \/dev/${!vgName}/${!lvName}  ${!lvMountPoint}  $lvfileSystem   defaults   0 0" /etc/fstab | tee tempLVMComposer_confPersistent.txt; cat tempLVMComposer_confPersistent.txt > /etc/fstab
+										fi
+									else
+										echo "${green}(i) Se detectó que el directorio ${!lvMountPoint} ya se encuentra configurado en el /etc/fstab para ser montado sobre /dev/${!vgName}/${!lvName}. No se realizarán cambios en el /etc/fstab para este LV.${reset}"
+									fi
 								else
 									echo "${yellow}[!] ATENCION: El directorio ${!lvMountPoint} se encuentra configurado en el /etc/fstab para ser montado sobre un File System diferente al /dev/${!vgName}/${!lvName}. Realizando cambios en el archivo /etc/fstab para montarlo sobre /dev/${!vgName}/${!lvName}.${reset}"
 									lineToReplace=$(awk '{print $2}' /etc/fstab | grep "^${!lvMountPoint}$")
-									sed "/^$lineToReplace/c \/dev/${!vgName}/${!lvName}  ${!lvMountPoint}  $lvfileSystem   defaults   0 0" /etc/fstab | tee tempLVMComposer_confPersistent.txt; cat tempLVMComposer_confPersistent.txt > /etc/fstab
+
+									# Configurar el orden de montura de los FileSystem:
+									if [[ ${!lvOrderMount} = "yes" ]]; then
+										# Si es el primero, establece la configuración normal
+										if [[ ${lvCount} -eq 1 ]]; then
+
+											if [[ ${!lvMountAfter} ]]; then
+												sed "/^$lineToReplace/c \/dev/${!vgName}/${!lvName}  ${!lvMountPoint}  $lvfileSystem   defaults,x-systemd.requires-mounts-for=${!lvMountAfter}   0 0" /etc/fstab | tee tempLVMComposer_confPersistent.txt; cat tempLVMComposer_confPersistent.txt > /etc/fstab
+											else
+												sed "/^$lineToReplace/c \/dev/${!vgName}/${!lvName}  ${!lvMountPoint}  $lvfileSystem   defaults   0 0" /etc/fstab | tee tempLVMComposer_confPersistent.txt; cat tempLVMComposer_confPersistent.txt > /etc/fstab
+											fi
+
+										else
+											sed "/^$lineToReplace/c \/dev/${!vgName}/${!lvName}  ${!lvMountPoint}  $lvfileSystem   defaults,x-systemd.requires-mounts-for=$requireMount   0 0" /etc/fstab | tee tempLVMComposer_confPersistent.txt; cat tempLVMComposer_confPersistent.txt > /etc/fstab
+										fi
+									else
+										sed "/^$lineToReplace/c \/dev/${!vgName}/${!lvName}  ${!lvMountPoint}  $lvfileSystem   defaults   0 0" /etc/fstab | tee tempLVMComposer_confPersistent.txt; cat tempLVMComposer_confPersistent.txt > /etc/fstab
+									fi
+
 									rm -f tempLVMComposer_confPersistent.txt
 								fi
 							else
@@ -314,9 +344,26 @@ for VG in $(grep -Ew 'VG[0-9]{1,6}:' $1 | grep -Eo 'VG[0-9]{1,6}'); do
 									echo "" >> /etc/fstab
 									echo "# ${!lvdescription}" >> /etc/fstab
 								fi
-								echo "/dev/${!vgName}/${!lvName}  ${!lvMountPoint}  $lvfileSystem   defaults   0 0" >> /etc/fstab
+
+								# Configurar el orden de montura de los FileSystem:
+								if [[ ${!lvOrderMount} = "yes" ]]; then
+									# Si es el primero, establece la configuración normal
+									if [[ ${lvCount} -eq 1 ]]; then
+
+										if [[ ${!lvMountAfter} ]]; then
+											echo "/dev/${!vgName}/${!lvName}  ${!lvMountPoint}  $lvfileSystem   defaults,x-systemd.requires-mounts-for=${!lvMountAfter}   0 0" >> /etc/fstab
+										else
+											echo "/dev/${!vgName}/${!lvName}  ${!lvMountPoint}  $lvfileSystem   defaults   0 0" >> /etc/fstab
+										fi
+									else
+										echo "/dev/${!vgName}/${!lvName}  ${!lvMountPoint}  $lvfileSystem   defaults,x-systemd.requires-mounts-for=$requireMount   0 0" >> /etc/fstab
+									fi
+								else
+									echo "/dev/${!vgName}/${!lvName}  ${!lvMountPoint}  $lvfileSystem   defaults   0 0" >> /etc/fstab
+								fi
 							fi
 
+							requireMount=${!lvMountPoint}
 							echo "${green}(i) Montando el File system.${reset}"
 							mount ${!lvMountPoint} 
 

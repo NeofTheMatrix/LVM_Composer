@@ -353,4 +353,5 @@ This will configure the FS in the **/etc/fstab** file as follows:
 ### General features:
 
 The disk partitioning scheme used by LVM_composer.sh by default is GPT.
+This script uses utilities like sed, awk, parted, lvm which must be installed on your system for it to work without problems.
 

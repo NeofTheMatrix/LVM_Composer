@@ -344,7 +344,7 @@ This will configure the FS in the **/etc/fstab** file as follows:
 ```
 # These FS will be mounted in the same order that they are configured in the .yml file:
 /dev/vgdata01/lvdata01  /mntvg1/data   xfs  defaults                                              0  0
-/dev/vgdata01/lvdata02  /mntvg1/data2  xfs  defaults,x-systemd.requires-mounts-for=/mntvg1/data2  0  0
+/dev/vgdata01/lvdata02  /mntvg1/data2  xfs  defaults,x-systemd.requires-mounts-for=/mntvg1/data   0  0
 /dev/vgdata02/lvdata01  /mntvg2/data   xfs  defaults,x-systemd.requires-mounts-for=/mntvg1/data2  0  0
 /dev/vgdata02/lvdata02  /mntvg2/data2  xfs  defaults,x-systemd.requires-mounts-for=/mntvg2/data   0  0
 ```

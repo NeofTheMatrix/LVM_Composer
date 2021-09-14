@@ -1,5 +1,5 @@
 #!/bin/bash
-# LVM Composer 1.0
+# LVM Composer 1.1
 # Por: Anderson J. Campos R. - 2021
 
 toDay=$(date +%d-%m-%Y)

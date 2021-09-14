@@ -210,6 +210,145 @@ VG1:
       description: This is LV created with LVM Composer.
 ```
 
+#### lvs - Mount order of filesystems:
+
+Sometimes you may want to configure a specific mount order for LVM FS. For these cases, you can use the **ordermount** parameter before configuring the Logical volumes.
+
+By default the value of the **ordermount** parameter is "no", if you want to set a specific mount order configuration for the FS, set this property to **yes**:
+
+```
+VG1:
+  name: vgdata01
+  disks:
+    disk1: sdb
+  lvs:
+    ordermount: yes
+    lv1:
+      name: lvdata01
+      size: 20G
+      filesystem: xfs
+      mountpoint: /mnt/data
+      persistent: yes
+      description: These FS will be mounted in the same order that they are configured in the .yml file
+    lv2:
+      name: lvdata02
+      size: 10G
+      filesystem: xfs
+      mountpoint: /mnt/data2
+      persistent: yes
+    lv3:
+      name: lvdata03
+      size: 5G
+      filesystem: xfs
+      mountpoint: /mnt/data3
+      persistent: yes
+```
+
+The previous configuration establishes that the FS "/mnt/data3" will always be mounted after "/mnt/data2", and this in turn will always be mounted after "/mnt/data".
+
+You will see this setting in the **/etc/fstab** file, and it will look like this:
+
+```
+# These FS will be mounted in the same order that they are configured in the .yml file:
+/dev/vgdata01/lvdata01  /mnt/data   xfs  defaults                                             0  0
+/dev/vgdata01/lvdata02  /mnt/data2  xfs  defaults,x-systemd.requires-mounts-for=/mnt/data     0  0
+/dev/vgdata01/lvdata03  /mnt/data3  xfs  defaults,x-systemd.requires-mounts-for=/mnt/data2    0  0
+```
+
+In the previous case, the FS "/mnt/data", being the first in the lvs list, will not wait for other FS to be mounted, you will notice that the systemd mount options only has the value "defaults" for this FS.  You can change this with the **mountafter** parameter, assigning it as a value the mount point that must be mounted before being able to start mounting all the FS set in the **lvs:** key.
+
+```
+VG1:
+  name: vgdata01
+  disks:
+    disk1: sdb
+  lvs:
+    ordermount: yes
+    mountafter: /mnt/vgtest02/test
+    lv1:
+      name: lvdata01
+      size: 20G
+      filesystem: xfs
+      mountpoint: /mnt/data
+      persistent: yes
+      description: These FS will be mounted in the same order that they are configured in the .yml file
+    lv2:
+      name: lvdata02
+      size: 10G
+      filesystem: xfs
+      mountpoint: /mnt/data2
+      persistent: yes
+```
+
+The previous configuration establishes that the FS "/mnt/data" must always be mounted after "/mnt/vgtest02/test". For its part, the FS "/mnt/data2" will always be mounted after the FS "/mnt/data".
+
+This will configure the FS in the **/etc/fstab** file as follows:
+
+```
+# These FS will be mounted in the same order that they are configured in the .yml file:
+/dev/vgdata01/lvdata01  /mnt/data   xfs  defaults,x-systemd.requires-mounts-for=/mnt/vgtest02/test   0  0
+/dev/vgdata01/lvdata02  /mnt/data2  xfs  defaults,x-systemd.requires-mounts-for=/mnt/data            0  0
+```
+
+- **Important note:** Make sure that the FS set in the **mountafter** parameter exists, and that it will always be mounted at system boot, otherwise the system may have problems starting.
+
+The **mountafter** parameter can also be useful to configure the mount order between FS of different volume groups:
+
+```
+VG1:
+  name: vgdata01
+  disks:
+    disk1: sdb
+  lvs:
+    ordermount: yes
+    lv1:
+      name: lvdata01
+      size: 20G
+      filesystem: xfs
+      mountpoint: /mntvg1/data
+      persistent: yes
+      description: These FS will be mounted in the same order that they are configured in the .yml file
+    lv2:
+      name: lvdata02
+      size: 10G
+      filesystem: xfs
+      mountpoint: /mntvg1/data2
+      persistent: yes
+      
+VG2:
+  name: vgdata02
+  disks:
+    disk1: sdc
+  lvs:
+    ordermount: yes
+    mountafter: /mntvg1/data2
+    lv1:
+      name: lvdata01
+      size: 10G
+      filesystem: xfs
+      mountpoint: /mntvg2/data
+      persistent: yes
+      description: These FS will be mounted in the same order that they are configured in the .yml file
+    lv2:
+      name: lvdata02
+      size: 15G
+      filesystem: xfs
+      mountpoint: /mntvg2/data2
+      persistent: yes
+```
+
+The previous configuration establishes that the **VG2** FS will always be mounted after the **VG1** FS, and all will be mounted in the order established in the .yml file.
+
+This will configure the FS in the **/etc/fstab** file as follows:
+
+```
+# These FS will be mounted in the same order that they are configured in the .yml file:
+/dev/vgdata01/lvdata01  /mntvg1/data   xfs  defaults                                              0  0
+/dev/vgdata01/lvdata02  /mntvg1/data2  xfs  defaults,x-systemd.requires-mounts-for=/mntvg1/data2  0  0
+/dev/vgdata02/lvdata01  /mntvg2/data   xfs  defaults,x-systemd.requires-mounts-for=/mntvg1/data2  0  0
+/dev/vgdata02/lvdata02  /mntvg2/data2  xfs  defaults,x-systemd.requires-mounts-for=/mntvg2/data   0  0
+```
+
 
 ### General features:
 

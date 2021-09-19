@@ -1,9 +1,10 @@
 #!/bin/bash
-# LVM Composer 1.1
+# LVM Composer 1.3
 # Por: Anderson J. Campos R. - 2021
+# Repositorio GitHub: https://github.com/NeofTheMatrix/LVM_Composer
 
 toDay=$(date +%d-%m-%Y)
-toHour=$(date +"%I%M%S")
+nowHour=$(date +"%I%M%S")
 HOUR=$(date +"%I:%M %p")
 
 red=`tput setaf 9`
@@ -11,38 +12,61 @@ yellow=`tput setaf 11`
 green=`tput setaf 14`
 reset=`tput sgr0`
 
-
 echo "${green}(i) ¡Bienvenido a LVM Composer!"
+
+if [[ $# -eq 0 ]]; then
+	echo "${red}(X) Se espera como primer parámetro el nombre del archivo con extesión .yml que contenga los datos de los VG y LV a crear o extender. ${reset}"
+	echo "${green}(i) Visite el repositorio ''https://github.com/NeofTheMatrix/LVM_Composer'' para más información.${reset}"
+	exit 1
+fi
+
+locationDisks='/dev'
+
+if [[ $2 ]]; then
+	if [[ $2 = "--locationDisks" ]]; then
+		if [[ $3 ]]; then
+			locationDisks=$3
+		else
+			echo "${red}(X) Debe proporcionar la ruta de los dispositivos de bloque a usar en el parámetro --locationDisks.${reset}"
+			exit 1
+		fi
+	else
+		echo "${red}(X) No se reconoce el parámetro ''$2''. ${reset}"
+		exit 1
+	fi
+fi
+
+
 echo "${green}(i) Tomando evidencias previas del estado actual del storage en este servidor...${reset}"
 sleep 2
-echo "" > LVM_composer_before_$toDay_$toHour.out
-echo "${green}(i) Dispositivos de bloque en este servidor antes de iniciar el proceso ($(hostname) - $toDay $HOUR):${reset}" | tee -a LVM_composer_before_$toDay_$toHour.out
-lsblk -l | tee -a LVM_composer_before_$toDay_$toHour.out
-echo "-------------------------------------------------" | tee -a LVM_composer_before_$toDay_$toHour.out
-lsblk | tee -a LVM_composer_before_$toDay_$toHour.out
+echo "" > LVM_composer_before_$toDay_$nowHour.out
+echo "${green}(i) Dispositivos de bloque en este servidor antes de iniciar el proceso ($(hostname) - $toDay $HOUR):${reset}" | tee -a LVM_composer_before_$toDay_$nowHour.out
+lsblk -l | tee -a LVM_composer_before_$toDay_$nowHour.out
+echo "-------------------------------------------------" | tee -a LVM_composer_before_$toDay_$nowHour.out
+lsblk | tee -a LVM_composer_before_$toDay_$nowHour.out
 
-echo -e "\n\n" | tee -a LVM_composer_before_$toDay_$toHour.out 
+echo -e "\n\n" | tee -a LVM_composer_before_$toDay_$nowHour.out 
 echo "${green}(i) Physical volumes en este servidor antes de iniciar el proceso:${reset}"
-pvdisplay | tee -a LVM_composer_before_$toDay_$toHour.out
+pvdisplay | tee -a LVM_composer_before_$toDay_$nowHour.out
 
-echo -e "\n\n" | tee -a LVM_composer_before_$toDay_$toHour.out
+echo -e "\n\n" | tee -a LVM_composer_before_$toDay_$nowHour.out
 echo "${green}(i) Volumen Groups en este servidor antes de iniciar el proceso:${reset}"
-vgdisplay | tee -a LVM_composer_before_$toDay_$toHour.out
+vgdisplay | tee -a LVM_composer_before_$toDay_$nowHour.out
 
-echo -e "\n\n" | tee -a LVM_composer_before_$toDay_$toHour.out
+echo -e "\n\n" | tee -a LVM_composer_before_$toDay_$nowHour.out
 echo "${green}(i) Logical volumes en este servidor antes de iniciar el proceso:${reset}"
-lvdisplay | tee -a LVM_composer_before_$toDay_$toHour.out
+lvdisplay | tee -a LVM_composer_before_$toDay_$nowHour.out
 
-echo -e "\n\n" | tee -a LVM_composer_before_$toDay_$toHour.out
+echo -e "\n\n" | tee -a LVM_composer_before_$toDay_$nowHour.out
 echo "${green}(i) Estructura del File System de este servidor:${reset}"
-df -hT | tee -a LVM_composer_before_$toDay_$toHour.out
+df -hT | tee -a LVM_composer_before_$toDay_$nowHour.out
 
-echo -e "\n\n" | tee -a LVM_composer_before_$toDay_$toHour.out
+echo -e "\n\n" | tee -a LVM_composer_before_$toDay_$nowHour.out
 echo "${green}(i) Contenido del archivo /etc/fstab:${reset}"
-cat /etc/fstab | tee -a LVM_composer_before_$toDay_$toHour.out
+cat /etc/fstab | tee -a LVM_composer_before_$toDay_$nowHour.out
 
 echo -e "\n\n"
-echo "${green}(i) Se dejaron las evidencias del estado actual del storage de este servidor en el archivo: LVM_composer_before_$toDay_$toHour.out ${reset}"
+echo "${green}(i) Se dejaron las evidencias del estado actual del storage de este servidor en el archivo: LVM_composer_before_$toDay_$nowHour.out ${reset}"
 
 echo -e "\n\n\n\n"
 
@@ -90,9 +114,13 @@ for VG in $(grep -Ew 'VG[0-9]{1,6}:' $1 | grep -Eo 'VG[0-9]{1,6}'); do
 			disk="LVM_${VG}_disks_disk${disksCount}"
 
 			if [[ ${!disk} ]]; then
-				# Verificar si el archivo del disco existe en /dev y que esté disponible:
-				if [[ $(ls /dev | grep -w ${!disk} | wc -l) -lt 1 ]]; then
-					echo "${red}(X) No existe el archivo de dispositivo /dev/${!disk} ${reset}"
+				# Verificar si el archivo del disco existe en $locationDisks y que esté disponible:
+				if [[ $(ls $locationDisks | grep -w ${!disk} | wc -l) -lt 1 ]]; then
+					if [[ $locationDisks = "/dev" ]]; then
+						echo "${red}(X) No existe el archivo de dispositivo ''$locationDisks/${!disk}''. Use el parámetro --locationDisks para proporcionar una ruta diferente de ubicación de los archivos de discos.  ${reset}"
+					else
+						echo "${red}(X) No existe el archivo de dispositivo ''$locationDisks/${!disk}''. Verifique que la ruta que proporcionó al parámetro --locationDisks sea la correcta.  ${reset}"
+					fi
 					exit 2
 				else
 					# Verificar si ya es parte de un PV:
@@ -138,13 +166,13 @@ for VG in $(grep -Ew 'VG[0-9]{1,6}:' $1 | grep -Eo 'VG[0-9]{1,6}'); do
 							echo "${green}(i) Creando la primera partición del disco ${!disk}, de tipo LVM con el esquema GPT.${reset}"
 							startPartition="2048s"
 							# Se crea la primera partición etiquetando el disco con el esquema GPT
-							parted -s /dev/${!disk} mklabel gpt mkpart $partitionName $startPartition ${!partitionSize}
+							parted -s $locationDisks/${!disk} mklabel gpt mkpart $partitionName $startPartition ${!partitionSize}
 							udevadm settle
-							parted -s /dev/${!disk} set $partitionCount lvm on
+							parted -s $locationDisks/${!disk} set $partitionCount lvm on
 
 							startPartition=${!partitionSize}
 
-							parted /dev/${!disk} print
+							parted $locationDisks/${!disk} print
 						else
 							
 							partitionEnd=$(($(echo $startPartition | awk -F"GB" '{ print $1 }') + $(echo ${!partitionSize} | awk -F"GB" '{ print $1 }')))
@@ -152,13 +180,13 @@ for VG in $(grep -Ew 'VG[0-9]{1,6}:' $1 | grep -Eo 'VG[0-9]{1,6}'); do
 
 							echo "${green}(i) Creando otra partición del disco ${!disk}, de tipo LVM. Start: $startPartition, End: $partitionEnd ${reset}"
 
-							parted -s /dev/${!disk} mkpart $partitionName $startPartition $partitionEnd
+							parted -s $locationDisks/${!disk} mkpart $partitionName $startPartition $partitionEnd
 							udevadm settle
-							parted -s /dev/${!disk} set $partitionCount lvm on
+							parted -s $locationDisks/${!disk} set $partitionCount lvm on
 
 							startPartition=$partitionEnd
 
-							parted /dev/${!disk} print
+							parted $locationDisks/${!disk} print
 						fi
 						
 						partitionedDisk=( "${partitionedDisk[@]}" ${!disk}$partitionCount )
@@ -198,10 +226,10 @@ for VG in $(grep -Ew 'VG[0-9]{1,6}:' $1 | grep -Eo 'VG[0-9]{1,6}'); do
 
 					if [[ ${!diskName} ]]; then
 						diskName=${!diskName}
-						echo "${green}(i) Se creará una partición unica, tomando el 100% del espacio del disco /dev/$disk. La partición se llamará $diskName. ${reset}"
+						echo "${green}(i) Se creará una partición unica, tomando el 100% del espacio del disco $locationDisks/$disk. La partición se llamará $diskName. ${reset}"
 					else
 						diskName="primary"
-						echo "${green}(i) Se creará una partición unica con el esquema GTP, tomando el 100% del espacio del disco /dev/$disk. La partición se llamará $diskName. ${reset}"
+						echo "${green}(i) Se creará una partición unica con el esquema GTP, tomando el 100% del espacio del disco $locationDisks/$disk. La partición se llamará $diskName. ${reset}"
 					fi
 
 					break
@@ -209,24 +237,24 @@ for VG in $(grep -Ew 'VG[0-9]{1,6}:' $1 | grep -Eo 'VG[0-9]{1,6}'); do
 
 			done
 
-			#echo "Preparar disco físico: parted -s /dev/${!disk} mkpart ${!diskName} 2048s 100% "
-			echo "${green}(i) Creando partición del 100% del disco /dev/$disk con el esquema GTP.${reset}"
-			parted -s /dev/$disk mklabel gpt mkpart $diskName 2048s 100%
+			#echo "Preparar disco físico: parted -s $locationDisks/${!disk} mkpart ${!diskName} 2048s 100% "
+			echo "${green}(i) Creando partición del 100% del disco $locationDisks/$disk con el esquema GTP.${reset}"
+			parted -s $locationDisks/$disk mklabel gpt mkpart $diskName 2048s 100%
 			udevadm settle
-			parted -s /dev/$disk set 1 lvm on
+			parted -s $locationDisks/$disk set 1 lvm on
 
-			parted /dev/$disk print
+			parted $locationDisks/$disk print
 		done
 
 		# Crear los PV con los discos ya particionados:
 		disksForVG=""
 		# Discos con una sola partición:
 		for disk in "${noPartitionedDisk[@]}"; do
-			disksForVG="$disksForVG /dev/${disk}1"
+			disksForVG="$disksForVG $locationDisks/${disk}1"
 		done
 		# Discos con una o más de una partición:
 		for disk in "${partitionedDisk[@]}"; do
-			disksForVG="$disksForVG /dev/${disk}"
+			disksForVG="$disksForVG $locationDisks/${disk}"
 		done
 
 		echo "${green}(i) Se etiquetarán los siguientes discos como Physical volume: $disksForVG ${reset}"
@@ -270,15 +298,69 @@ for VG in $(grep -Ew 'VG[0-9]{1,6}:' $1 | grep -Eo 'VG[0-9]{1,6}'); do
 				# Verificar si el LV no existe, para crearlo, de lo contrario se realiza el extend:
 				if [ $(lvdisplay ${!vgName} | grep "LV Name" | grep ${!lvName} | wc -l) -gt 0 ]; then
 					# Realizar extend al LV existente de este VG:
-					echo "${green}(i) Se detectó un LV existente con el nombre ${!lvName} en este VG. Se procederá a la ampliación de este LV.${reset}"
-					lvextend -L +${!lvSize} /dev/${!vgName}/${!lvName}
-					echo "${green}(i) Información del Logical volume ${!vgName} extendido:${reset}"
-					lvdisplay /dev/${!vgName}/${!lvName}
+					totalPE=$(vgdisplay ${!vgName} | grep "Total PE" | awk '{print $3}')
+					if [[ ${!lvSize} =~ ^[0-9]{3}%$ ]]; then
+						
+						echo "${green}(i) Se detectó un LV existente con el nombre ${!lvName} en este VG. Se procederá a la ampliación de este LV al 100% de capacidad del VG.${reset}"
+						lvextend -r -l +100%FREE $locationDisks/${!vgName}/${!lvName}
+
+					elif [[ ${!lvSize} =~ ^[0-9]{2}%$ ]]; then
+						
+						echo "${green}(i) Se detectó un LV existente con el nombre ${!lvName} en este VG. Se procederá a redimensionar este LV.${reset}"
+						lvextend -r -l +${!lvSize}FREE $locationDisks/${!vgName}/${!lvName}
+						#percent=$(echo ${!lvSize} | awk -F"%" '{print $1}')
+						#let multipl=$percent*$totalPE
+						#let allocPE=$multipl/100
+						#lvextend -r -l $allocPE $locationDisks/${!vgName}/${!lvName}
+					else
+						echo "${green}(i) Se detectó un LV existente con el nombre ${!lvName} en este VG. Se procederá a la ampliación de este LV.${reset}"
+						lvextend -r -L +${!lvSize} $locationDisks/${!vgName}/${!lvName}
+					fi
+
+					echo "${green}(i) Información del Logical volume ${!lvName} extendido:${reset}"
+					lvdisplay $locationDisks/${!vgName}/${!lvName}
+
+
 				else
 					# Crear nuevo LV en este VG:
 					echo "${green}(i) No se detectó un LV existente con el nombre ${!lvName} en este VG. Se procederá a crear un nuevo LV.${reset}"
-					lvcreate -n ${!lvName} -L ${!lvSize} ${!vgName}
-					echo "${green}(i) Información del Logical volume ${!vgName} creado:${reset}"
+					totalPE=$(vgdisplay ${!vgName} | grep "Total PE" | awk '{print $3}')
+					
+					if [[ ${!lvSize} =~ ^[0-9]{3}%$ ]]; then
+
+						lvcreate -n ${!lvName} -l $totalPE ${!vgName}
+
+					elif [[ ${!lvSize} =~ ^[0-9]{2}%$ ]]; then
+
+						percent=$(echo ${!lvSize} | awk -F"%" '{print $1}')
+						let multipl=$percent*$totalPE
+						let allocPE=$multipl/100
+
+						lvcreate -n ${!lvName} -l $allocPE ${!vgName}
+
+					else
+						lvcreate -n ${!lvName} -L ${!lvSize} ${!vgName}
+						if [ $(lvdisplay ${!vgName} | grep "LV Name" | grep ${!lvName} | wc -l) -gt 0 ]; then
+							echo "${green}(i) Logical volume creado.${reset}"
+						else
+							echo "${yellow}[!] No se logró crear el Logical volume, puede que el VG ${!vgName} no cuente con el espacio requerido.${reset}"
+							read -p "${yellow}[?] ¿Desea crear el Logical volume usando todo el espacio disponible en el VG ${!vgName}? (yes/no. Default no): ${reset}" nextWithTotalPE
+							
+							if [[ $nextWithTotalPE = "yes" ]]; then
+								echo "${green}(i) Intentando crear con la totalidad de las particiones físicas.${reset}"
+								lvcreate -n ${!lvName} -l $totalPE ${!vgName}
+							else
+								read -p "${yellow}[?] ¿Desea finalizar la ejecución? (yes/no. Default no):" stopExec
+								if [[ $stopExec = "yes" ]]; then
+									exit 1
+								fi
+							fi
+
+						fi
+
+					fi
+
+					echo "${green}(i) Información del Logical volume ${!lvName} creado:${reset}"
 					lvdisplay /dev/${!vgName}/${!lvName}
 
 					# Agregar el sistema de archivos.
@@ -296,13 +378,13 @@ for VG in $(grep -Ew 'VG[0-9]{1,6}:' $1 | grep -Eo 'VG[0-9]{1,6}'); do
 						# Hacer el punto de montura persitente si se requiere:
 						if [ ${!lvPersistent} = "yes" ]; then
 
-							echo "${green}(i) Creando archivo de respaldo /etc/fstab_backup_${toDay}_${toHour} ${reset}"
-							cp /etc/fstab /etc/fstab_backup_${toDay}_${toHour}
+							echo "${green}(i) Creando archivo de respaldo /etc/fstab_backup_${toDay}_${nowHour} ${reset}"
+							cp /etc/fstab /etc/fstab_backup_${toDay}_${nowHour}
 
 							# Verificar si el fstab ya tiene este punto de montura configurado:
 							if [[ $(awk '{print $2}' /etc/fstab | grep "^${!lvMountPoint}$" | wc -l) -eq 1 ]]; then
 								# Verificar si está configurado para ser montado sobre el mismo VG y LV, sino reemplazar:
-								if [ $(grep /dev/${!vgName}/${!lvName} /etc/fstab | awk '{print $2}' | grep "^${!lvMountPoint}$"  | wc -l) -gt 0  || $(grep $(blkid | grep /dev/mapper/${!vgName}-${!lvName} | awk '{print $2}') /etc/fstab | wc -l) -gt 0 ]; then
+								if [[ $(grep /dev/${!vgName}/${!lvName} /etc/fstab | awk '{print $2}' | grep "^${!lvMountPoint}$"  | wc -l) -gt 0  || $(grep $(blkid | grep /dev/${!vgName}-${!lvName} | awk '{print $2}') /etc/fstab | wc -l) -gt 0 ]]; then
 									# Hay que verificar si tiene la configuración de orden de montura, si esta es requerida:
 									if [[ ${!lvOrderMount} = "yes" ]]; then
 										#statements
@@ -394,34 +476,34 @@ echo -e "\n\n"
 
 echo "${green}(i) Tomando evidencias posteriores del estado actual del storage en este servidor...${reset}"
 sleep 2
-echo "" > LVM_composer_after_$toDay_$toHour.out
-echo "${green}(i) Dispositivos de bloque en este servidor ($(hostname) - $toDay $HOUR): ${reset}" | tee -a LVM_composer_after_$toDay_$toHour.out
-lsblk -l | tee -a LVM_composer_after_$toDay_$toHour.out
-echo "-------------------------------------------------" | tee -a LVM_composer_after_$toDay_$toHour.out
-lsblk | tee -a LVM_composer_after_$toDay_$toHour.out
+echo "" > LVM_composer_after_$toDay_$nowHour.out
+echo "${green}(i) Dispositivos de bloque en este servidor ($(hostname) - $toDay $HOUR): ${reset}" | tee -a LVM_composer_after_$toDay_$nowHour.out
+lsblk -l | tee -a LVM_composer_after_$toDay_$nowHour.out
+echo "-------------------------------------------------" | tee -a LVM_composer_after_$toDay_$nowHour.out
+lsblk | tee -a LVM_composer_after_$toDay_$nowHour.out
 
-echo -e "\n\n" | tee -a LVM_composer_before_$toDay_$toHour.out 
+echo -e "\n\n" | tee -a LVM_composer_before_$toDay_$nowHour.out 
 echo "${green}(i) Physical volumes en este servidor después de terminar el proceso:${reset}"
-pvdisplay | tee -a LVM_composer_after_$toDay_$toHour.out
+pvdisplay | tee -a LVM_composer_after_$toDay_$nowHour.out
 
-echo -e "\n\n" | tee -a LVM_composer_before_$toDay_$toHour.out
+echo -e "\n\n" | tee -a LVM_composer_before_$toDay_$nowHour.out
 echo "${green}(i) Volumen Groups en este servidor después de terminar el proceso:${reset}"
-vgdisplay | tee -a LVM_composer_after_$toDay_$toHour.out
+vgdisplay | tee -a LVM_composer_after_$toDay_$nowHour.out
 
-echo -e "\n\n" | tee -a LVM_composer_before_$toDay_$toHour.out
+echo -e "\n\n" | tee -a LVM_composer_before_$toDay_$nowHour.out
 echo "${green}(i) Logical volumes en este servidor después de terminar el proceso:${reset}"
-lvdisplay | tee -a LVM_composer_after_$toDay_$toHour.out
+lvdisplay | tee -a LVM_composer_after_$toDay_$nowHour.out
 
-echo -e "\n\n" | tee -a LVM_composer_before_$toDay_$toHour.out
+echo -e "\n\n" | tee -a LVM_composer_before_$toDay_$nowHour.out
 echo "${green}(i) Estructura del File System de este servidor:${reset}"
-df -hT | tee -a LVM_composer_after_$toDay_$toHour.out
+df -hT | tee -a LVM_composer_after_$toDay_$nowHour.out
 
-echo -e "\n\n" | tee -a LVM_composer_before_$toDay_$toHour.out
+echo -e "\n\n" | tee -a LVM_composer_before_$toDay_$nowHour.out
 echo "${green}(i) Contenido del archivo /etc/fstab:${reset}"
-cat /etc/fstab | tee -a LVM_composer_after_$toDay_$toHour.out
+cat /etc/fstab | tee -a LVM_composer_after_$toDay_$nowHour.out
 
 echo -e "\n\n\n\n"
-echo "${green}(i) Se dejaron las evidencias del estado actual del storage de este servidor en el archivo: LVM_composer_after_$toDay_$toHour.out${reset}"
+echo "${green}(i) Se dejaron las evidencias del estado actual del storage de este servidor en el archivo: LVM_composer_after_$toDay_$nowHour.out${reset}"
 echo -e "\n\n\n\n"
 sleep 1
 

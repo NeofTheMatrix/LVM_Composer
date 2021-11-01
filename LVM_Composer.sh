@@ -1,5 +1,5 @@
 #!/bin/bash
-# LVM Composer 1.3
+# LVM Composer 1.3.1
 # Por: Anderson J. Campos R. - 2021
 # Repositorio GitHub: https://github.com/NeofTheMatrix/LVM_Composer
 
